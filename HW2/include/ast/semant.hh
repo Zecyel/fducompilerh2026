@@ -52,7 +52,7 @@ private:
     Name_Maps *name_maps;
     map<AST*, AST_Semant*> semant_map;
 public:
-    AST_Semant_Map() {
+    AST_Semant_Map(Name_Maps *name_maps = nullptr) : name_maps(name_maps) {
         semant_map = map<AST*, AST_Semant*>();
     }
     ~AST_Semant_Map() {
@@ -74,6 +74,7 @@ public:
         }
         semant_map[node] = semant;
     }
+    void setNameMaps(Name_Maps *nm) { name_maps = nm; }
     Name_Maps* getNameMaps() { return name_maps; }
 };
 
@@ -87,7 +88,7 @@ private:
     int in_a_while_loop = 0; //for break and continue (handles nested while loops)
 public:
     int mode;
-    AST_Semant_Visitor(Name_Maps* const nm) : name_maps(nm), semant_map(new AST_Semant_Map()) {}
+    AST_Semant_Visitor(Name_Maps* const nm) : name_maps(nm), semant_map(new AST_Semant_Map(nm)) {}
 
     AST_Semant_Map* getSemantMap() { return semant_map; }
 
