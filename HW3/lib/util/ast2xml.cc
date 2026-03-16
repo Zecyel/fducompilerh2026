@@ -20,6 +20,84 @@ static bool _location_flag = true;
 static bool _semant_flag = true;
 static AST_Semant_Map *_semant_map = nullptr;
 
+void do_name_maps(XMLDocument *doc, XMLElement *xml_root, Name_Maps *nm, AST2XML &v) {
+#ifdef DEBUG
+  std::cout << "Start with NameMaps" << endl;
+#endif
+  if (nm  == nullptr) {
+    cerr << "Error: No NameMaps found" << endl;
+    return;
+  } 
+  XMLElement *cn = doc->NewElement("NameMaps");
+  set<string>* classes = nm->get_class_list();
+#ifdef DEBUG
+  std::cout << "number of classes = " << classes->size() << endl;
+#endif
+  for (string c : *classes) {
+    XMLElement *cn1 = doc->NewElement("Class");
+    cn1->SetAttribute("name", c.c_str());
+    string parent = nm->get_parent(c);
+    if (parent != "") {
+      cn1->SetAttribute("parent", parent.c_str());
+    }
+    set<string> *vars = nm->get_class_var_list(c);
+#ifdef DEBUG
+  std::cout << "Start with class vars" << endl;
+#endif
+    for (string var : *vars) {
+      XMLElement *cn2 = doc->NewElement("Var");
+      cn2->SetAttribute("id", var.c_str());
+      VarDecl *vd = nm->get_class_var(c, var);
+      if (vd != nullptr) {
+        vd->accept(v);
+        if (v.el != nullptr) {
+          cn2->InsertEndChild(v.el);
+        }
+      }
+      cn1->InsertEndChild(cn2);
+    }
+#ifdef DEBUG
+  cout << "Done with class vars" << endl; 
+#endif
+    for (string m : *nm->get_method_list(c)) {
+      XMLElement *cn3 = v.doc->NewElement("Method");
+      cn3->SetAttribute("name", m.c_str());
+      vector<string> *formals = nm->get_method_formal_list_string(c, m);
+      for (string f : *formals) {
+        XMLElement *cn4 = v.doc->NewElement("Formal");
+        cn4->SetAttribute("id", f.c_str());
+        Formal *fm = nm->get_method_formal(c, m, f);
+        if (fm != nullptr) {
+          fm->accept(v);
+          if (v.el != nullptr) {
+            cn4->InsertEndChild(v.el);
+          }
+        }
+        cn3->InsertEndChild(cn4);
+      }
+      set<string> *method_var_list = nm->get_method_var_list(c, m);
+      for (string mv : *method_var_list) {
+        XMLElement *cn5 = v.doc->NewElement("Var");
+        cn5->SetAttribute("id", mv.c_str());
+        VarDecl *vd = nm->get_method_var(c, m, mv);
+        if (vd != nullptr) {
+          vd->accept(v);
+          if (v.el != nullptr) {
+            cn5->InsertEndChild(v.el);
+          }
+        }
+        cn3->InsertEndChild(cn5);
+      }
+      cn1->InsertEndChild(cn3);
+    }
+    cn->InsertEndChild(cn1);
+  }
+  xml_root->InsertEndChild(cn);
+#ifdef DEBUG
+  std::cout << "Done with NameMaps" << endl;
+#endif
+}
+
 XMLDocument* ast2xml(Program *node, AST_Semant_Map *semant_map, bool location_flag, bool semant_flag) {
   _location_flag = location_flag;
   _semant_flag = semant_flag;
@@ -28,11 +106,19 @@ XMLDocument* ast2xml(Program *node, AST_Semant_Map *semant_map, bool location_fl
   v.doc= new XMLDocument();
   XMLDeclaration *decl = v.doc->NewDeclaration("xml version=\"1.0\" encoding=\"UTF-8\"");
   v.doc->InsertFirstChild(decl);
+  XMLElement* xml_root = v.doc->NewElement("FDMJAST");
+  if (semant_map != nullptr)
+    do_name_maps(v.doc, xml_root, semant_map->getNameMaps(), v);
+  else {
+    XMLElement *cn = v.doc->NewElement("NameMaps");
+    xml_root->InsertEndChild(cn);
+  }
 #ifdef DEBUG
   std::cout << "Start Visitor: " << endl;
 #endif
   node->accept(v);
-  v.doc->InsertEndChild(v.el);
+  xml_root->InsertEndChild(v.el);
+  v.doc->InsertEndChild(xml_root);
   return v.doc;
 }
 
@@ -54,21 +140,30 @@ static void set_position_and_semant(XMLElement *el, const Pos *pos, AST* node) {
   TypeKind tk = semant->get_type();
   el->SetAttribute("s_kind", AST_Semant::s_kind_string(kd).c_str());
   if (kd == AST_Semant::Kind::Value) {
-      el->SetAttribute("typeKind", fdmj::type_kind_string(tk).c_str());
+      string vv = fdmj::type_kind_string(tk);
+      std::transform(vv.begin(), vv.end(), vv.begin(), ::toupper);
+      if (vv == "INTARRAY") vv = "ARRAY";
+      el->SetAttribute("typeKind", vv.c_str());
       el->SetAttribute("lvalue", semant->is_lvalue() ? "true" : "false");
       switch (tk) {
-        case TypeKind::CLASS:
-          if (holds_alternative<string>(semant->get_type_par())) {
-            el->SetAttribute("cid", get<string>(semant->get_type_par()).c_str());
+        case TypeKind::CLASS: {
+          variant<monostate, string, int> type_par = semant->get_type_par();
+          string* class_name = get_if<string>(&type_par);
+          if (class_name != nullptr) {
+            el->SetAttribute("type_par", class_name->c_str());
           }
           break;
+        }
         case TypeKind::INT:
           break;
-        case TypeKind::ARRAY:
-          if (holds_alternative<int>(semant->get_type_par())) {
-            el->SetAttribute("arity", to_string(get<int>(semant->get_type_par())).c_str());
+        case TypeKind::ARRAY: {
+          variant<monostate, string, int> type_par = semant->get_type_par();
+          int* arity = get_if<int>(&type_par);
+          if (arity != nullptr) {
+            el->SetAttribute("type_par", to_string(*arity).c_str());
           }
           break;
+        }
         default:
           cerr << "Error: Unknown type kind" << endl;
           break;
