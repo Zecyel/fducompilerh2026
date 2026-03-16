@@ -130,6 +130,6 @@ public:
 };
 
 Name_Maps* makeNameMaps(Program* node);
-AST_Semant_Map* semant_analyze(Program* node);
+AST_Semant_Map* semant_analyze(Program* node, Name_Maps* nm = nullptr);
 
 #endif

@@ -1,5 +1,7 @@
 /build/
 /test/*.out
 /test/*.ast
+!/test/*.2.ast
+!/test/*.2-semant.ast
 *.pdf
 *.zip

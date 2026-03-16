@@ -46,9 +46,10 @@ int main(int argc, const char *argv[]) {
     //Semantic analysis
     std::cout << "Semantic analysis..." << std::endl;
     std::cout << "--Making Name Maps..." << endl;
-    Name_Maps *name_maps = makeNameMaps(root); 
+    Name_Maps *name_maps = makeNameMaps(root);
+    name_maps->print();
     std::cout << "--Analyzing Semantics..." << endl;
-    AST_Semant_Map *semant_map = semant_analyze(root); 
+    AST_Semant_Map *semant_map = semant_analyze(root, name_maps);
 
     cout << "Convert AST to XML with Semantic Info..." << endl;
     x = ast2xml(root, semant_map, with_location_info, true); // no semant info yet

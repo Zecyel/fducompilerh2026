@@ -15,22 +15,22 @@ using namespace fdmj;
 
 namespace {
 
-const string kMainClass = "__main__";
+const string kMainClass = "__$main__";
 const string kMainMethod = "main";
-const string kReturnFormal = "__$ret$__";
+const string kReturnPrefix = "_^return^_";
 
 [[noreturn]] void name_error(AST *node, const string &msg) {
     if (node != nullptr && node->getPos() != nullptr) {
-        cerr << "Error at " << node->getPos()->print() << ": " << msg << endl;
-    } else {
-        cerr << "Error: " << msg << endl;
+        cerr << "Error: at position " << node->getPos()->print() << endl;
     }
+    cerr << "Error: " << msg << endl;
+    cerr << "Name mapping failed due to errors. Compilation aborted." << endl;
     exit(1);
 }
 
-Formal *make_return_formal(Type *ret_type) {
+Formal *make_return_formal(Type *ret_type, const string &method_name) {
     Pos *p = new Pos(0, 0, 0, 0);
-    return new Formal(p, ret_type->clone(), new IdExp(new Pos(0, 0, 0, 0), kReturnFormal));
+    return new Formal(p, ret_type->clone(), new IdExp(new Pos(0, 0, 0, 0), kReturnPrefix + method_name));
 }
 
 } // namespace
@@ -76,11 +76,12 @@ void AST_Name_Map_Visitor::visit(MainMethod *node) {
         name_error(node, "internal: duplicated synthetic main method");
     }
 
-    Formal *ret = make_return_formal(new Type(new Pos(0, 0, 0, 0), TypeKind::INT, nullptr, nullptr));
-    if (!name_maps->add_method_formal(kMainClass, kMainMethod, kReturnFormal, ret)) {
+    Formal *ret = make_return_formal(new Type(new Pos(0, 0, 0, 0), TypeKind::INT, nullptr, nullptr), kMainMethod);
+    string ret_name = kReturnPrefix + kMainMethod;
+    if (!name_maps->add_method_formal(kMainClass, kMainMethod, ret_name, ret)) {
         name_error(node, "internal: duplicated synthetic main return type");
     }
-    if (!name_maps->add_method_formal_list(kMainClass, kMainMethod, {kReturnFormal})) {
+    if (!name_maps->add_method_formal_list(kMainClass, kMainMethod, {ret_name})) {
         name_error(node, "internal: failed to create main formal list");
     }
 
@@ -163,13 +164,9 @@ void AST_Name_Map_Visitor::visit(VarDecl *node) {
         return;
     }
 
-    if (name_maps->is_method_formal(current_visiting_class, current_visiting_method, node->id->id)) {
-        name_error(node, "local variable conflicts with formal parameter: " + node->id->id);
-    }
-
     if (!name_maps->add_method_var(current_visiting_class, current_visiting_method, node->id->id, node)) {
-        name_error(node, "duplicated local variable: " + current_visiting_class + "." +
-                           current_visiting_method + "." + node->id->id);
+        name_error(node, "Variable " + node->id->id + " is already declared in method " +
+                           current_visiting_method + " of class " + current_visiting_class);
     }
 }
 
@@ -195,11 +192,12 @@ void AST_Name_Map_Visitor::visit(MethodDecl *node) {
         }
     }
 
-    Formal *ret = make_return_formal(node->type);
-    if (!name_maps->add_method_formal(current_visiting_class, current_visiting_method, kReturnFormal, ret)) {
+    Formal *ret = make_return_formal(node->type, current_visiting_method);
+    string ret_name = kReturnPrefix + current_visiting_method;
+    if (!name_maps->add_method_formal(current_visiting_class, current_visiting_method, ret_name, ret)) {
         name_error(node, "internal: duplicated synthetic method return type");
     }
-    formal_names.push_back(kReturnFormal);
+    formal_names.push_back(ret_name);
 
     if (!name_maps->add_method_formal_list(current_visiting_class, current_visiting_method, formal_names)) {
         name_error(node, "failed to register formal list for method: " + current_visiting_method);
