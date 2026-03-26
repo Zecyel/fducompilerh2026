@@ -43,14 +43,13 @@ Tr_cx* Tr_nx::unCx(Temp_map* tm) {
 }
 
 Tr_ex* Tr_cx::unEx(Temp_map* tm) {
+    //now create the conditional jump to t or f for 1 or 0 respectively
+    vector<tree::Stm*>* sl  = new vector<tree::Stm*>();
+    TempExp *te = new TempExp(tree::Type::INT, tm->newtemp());
     tree::Label* t = tm->newlabel();
     true_list->patch(t);
     tree::Label* f = tm->newlabel();
     false_list->patch(f);
-    tree::Label* o = tm->newlabel();
-    //now create the conditional jump to t or f for 1 or 0 respectively
-    vector<tree::Stm*>* sl  = new vector<tree::Stm*>();
-    TempExp *te = new TempExp(tree::Type::INT, tm->newtemp());
     sl->push_back(new Move(te, new Const(0)));
     sl->push_back(this->stm);
     sl->push_back(new tree::LabelStm(t));
